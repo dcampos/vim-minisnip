@@ -26,9 +26,6 @@ function! minisnip#ShouldTrigger() abort
         endif
     endfor
 
-    if !s:in_snippet
-        return v:false
-    endif
     return search(g:minisnip_delimpat . '\|' . g:minisnip_finaldelimpat, 'e')
 endfunction
 
@@ -38,7 +35,6 @@ function! minisnip#Minisnip() abort
         " reset placeholder text history (for backrefs)
         let s:placeholder_texts = []
         let s:placeholder_text = ''
-        let s:in_snippet = v:true
         " adjust the indentation, use the current line as reference
         let l:ws = matchstr(getline(line('.')), '^\s\+')
         let l:lns = map(readfile(s:snippetfile), 'empty(v:val)? v:val : l:ws.v:val')
@@ -130,7 +126,6 @@ function! s:SelectPlaceholder() abort
             return
         finally
             let &wrapscan = l:ws
-            let s:in_snippet = v:false
         endtry
     finally
         let &wrapscan = l:ws
@@ -156,7 +151,7 @@ function! s:SelectPlaceholder() abort
         let @s=substitute(@s, '\V' . g:minisnip_backrefmarker . '\(\d\)',
             \"\\=\"'\" . substitute(get(
             \    s:placeholder_texts,
-            \    len(s:placeholder_texts) - str2nr(submatch(1)), ''
+            \    str2nr(submatch(1)), ''
             \), \"'\", \"''\", 'g') . \"'\"", 'g')
         " evaluate what's left
         let @s=eval(@s)
@@ -192,7 +187,7 @@ function! minisnip#complete() abort
     endif
 
     " Load all snippets that match.
-    let l:filetypes = split(&filetype, '\.')
+    let l:filetypes = extend(split(&filetype, '\.'), ['all'])
     let l:all = []
     for l:dir in split(g:minisnip_dir, s:pathsep())
         for l:path in glob(fnamemodify(l:dir, ':p') . '/*/*', 0, 1)
@@ -201,10 +196,8 @@ function! minisnip#complete() abort
             let l:name = l:f
 
             " Filetype snippet
-            if l:ft isnot# 'all'
-                if index(l:filetypes, l:ft) is -1
-                    continue
-                endif
+            if index(l:filetypes, l:ft) is -1
+                continue
             endif
 	    
             if l:name !~? '^' . l:base

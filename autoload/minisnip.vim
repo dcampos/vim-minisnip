@@ -8,11 +8,11 @@ function! minisnip#ShouldTrigger() abort
     " look for a snippet by that name
     for l:dir in split(g:minisnip_dir, s:pathsep())
         let l:dir = fnamemodify(l:dir, ':p')
-        let l:snippetfile = l:dir . '/' . s:cword
+        let l:snippetfile = l:dir . '/all/' . s:cword
 
         " filetype snippets override general snippets
         for l:filetype in split(&filetype, '\.')
-          let l:ft_snippetfile = l:dir . '/_' . l:filetype . '_' . s:cword
+          let l:ft_snippetfile = l:dir . '/' . l:filetype . '/' . s:cword
           if filereadable(l:ft_snippetfile)
               let l:snippetfile = l:ft_snippetfile
               break
@@ -26,6 +26,9 @@ function! minisnip#ShouldTrigger() abort
         endif
     endfor
 
+    if !s:in_snippet
+        return v:false
+    endif
     return search(g:minisnip_delimpat . '\|' . g:minisnip_finaldelimpat, 'e')
 endfunction
 
@@ -35,6 +38,7 @@ function! minisnip#Minisnip() abort
         " reset placeholder text history (for backrefs)
         let s:placeholder_texts = []
         let s:placeholder_text = ''
+        let s:in_snippet = v:true
         " adjust the indentation, use the current line as reference
         let l:ws = matchstr(getline(line('.')), '^\s\+')
         let l:lns = map(readfile(s:snippetfile), 'empty(v:val)? v:val : l:ws.v:val')
@@ -126,6 +130,7 @@ function! s:SelectPlaceholder() abort
             return
         finally
             let &wrapscan = l:ws
+            let s:in_snippet = v:false
         endtry
     finally
         let &wrapscan = l:ws
@@ -190,19 +195,18 @@ function! minisnip#complete() abort
     let l:filetypes = split(&filetype, '\.')
     let l:all = []
     for l:dir in split(g:minisnip_dir, s:pathsep())
-        for l:path in glob(fnamemodify(l:dir, ':p') . '/*', 0, 1)
+        for l:path in glob(fnamemodify(l:dir, ':p') . '/*/*', 0, 1)
             let l:f = fnamemodify(l:path, ':t')
-            let l:ft = l:f[1:stridx(l:f[1:], '_')]
+            let l:ft = fnamemodify(l:path, ':h:t')
             let l:name = l:f
 
             " Filetype snippet
-            if l:f[0] is# '_'
+            if l:ft isnot# 'all'
                 if index(l:filetypes, l:ft) is -1
                     continue
                 endif
-                let l:name = l:f[stridx(l:f[1:], '_') + 2:]
             endif
-
+	    
             if l:name !~? '^' . l:base
                 continue
             endif
